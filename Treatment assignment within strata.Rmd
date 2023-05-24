@@ -1,0 +1,70 @@
+---
+title: "Randomly assign treatments within strata"
+author: "Dan Aurell"
+date: "2023-05-24"
+output:   
+  html_document: 
+    keep_md: yes
+---
+
+```{r}
+library(tidyverse)
+```
+
+
+```{r}
+set.seed(10)
+fob <- rnorm(60, mean = 5, sd = 2)
+set.seed(10)
+varroa <- rpois(60, lambda = 20)
+
+datum <- data.frame(fob, varroa)
+
+datum <- datum %>% arrange(desc(varroa))
+stratum <- c(rep(1,6),rep(2,6),rep(3,6),rep(4,6),rep(5,6),rep(6,6),rep(7,6),rep(8,6),rep(9,6),rep(10,6))
+datum2 <- cbind(datum, stratum)
+
+datum2
+```
+
+
+```{r}
+x = c("Control", "Break-OA", "Break-FA", "FA", "OA", "AMZ")
+
+set.seed(10)
+trt <- c(
+  sample(x, 6), 
+  sample(x, 6), 
+  sample(x, 6), 
+  sample(x, 6), 
+  sample(x, 6),
+  sample(x, 6),
+  sample(x, 6),
+  sample(x, 6),
+  sample(x, 6),
+  sample(x, 6)
+  )
+
+trt
+```
+
+
+```{r}
+datum3 <- cbind(datum2, trt)
+
+datum3
+```
+
+
+```{r}
+datum3 %>% 
+  ggplot(aes(x=factor(trt), y=varroa)) +
+  geom_boxplot()
+
+
+datum3 %>% 
+  ggplot(aes(x=factor(trt), y=fob)) +
+  geom_boxplot()
+```
+
+
