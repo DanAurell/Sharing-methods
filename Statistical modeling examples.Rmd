@@ -100,13 +100,27 @@ m.phor.nb1 <- glmer.nb(mites_in_sample ~
                    data = tempdatum)
 summary(m.phor.nb1)
 
+
+#### To account for size of sample
+
+I THINK the cbind method and offset both will more heavily weight samples with more total count of mites and uninfested bees/ dead and alive mites
+- BUT we should look into this!
+
 - Ideally, I would prefer to use a composite response variable of successes and failures, e.g...
 
 glmer.nb(cbind(successes, failures) ~ 
         etc)
         
+- mite count on bees example
 glmer.nb(cbind(mites_in_sample, uninfested_bees) ~ 
         etc)
+        
+- Amitraz resistance test example
+glmer.nb(cbind(died, survived) ~ 
+        etc)
+
+
+
 
 ... but glmer.nb does not accept this formulation
 
