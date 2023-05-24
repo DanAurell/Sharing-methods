@@ -1,0 +1,170 @@
+---
+title: "For Rogan Tokach"
+author: "Dan Aurell"
+date: "2023-05-24"
+output:   
+  html_document: 
+    keep_md: yes
+---
+
+
+```{r}
+library(MASS)
+library(tidyverse)
+library(lme4)
+library(emmeans)
+```
+
+# Potentially useful analysis code
+
+## Choice of model distribution:
+
+- Gaussian (normal distribution) models
+  lm()
+  lmer()  (mixed model version)
+  
+  - Usually, I'm analyzing continuous variables like frames of bees, frames of brood with lm() or lmer()
+
+- Poisson models 
+  glm(family="poisson")
+  glmer(family="poisson")  (mixed model version)
+
+  - The basic choice for count data
+  - But assumes variance = mean
+  - Often, variance >> mean, which results in overdispersion when fitting Poisson models... increased chance of Type I error
+  - If evidence of overdispersion, use negative binomial model instead
+  - CAUTION... Link function: log
+  
+- Negative binomial model
+  glm(family="binomial")
+  glmer.nb()  (mixed model version)
+  - Allows for variance to be greater than mean
+  - CAUTION... Link function: log
+  
+### Example of checking for overdispersion
+- This is a simplistic way, but what I've been doing so far
+  
+dispersionstats <- datum %>%
+    filter(days %in% c(0,21,42),
+         !(col_no %in% qless)) %>% 
+ summarise(
+ means = mean(mites_recov_total),
+ variances = var(mites_recov_total),
+ ratio = variances/means)
+
+Variance-to-mean ratio of 22; use negative binomial distribution instead of Poisson  
+  
+
+- Logistic (binomial) regression
+  - When your response is a two-state outcome
+  - Your response variable can be a two-
+  - Assuming you are analyzing "survival"... 
+  glm(cbind(alive, dead)~predictor, family="binomial")
+  - CAUTION... Link function: logit
+
+
+
+
+## Choice of model type / experimental designs
+
+Experiment:
+- Say you have measured data for 50 colonies on 4 sampling days: days 0, 30, 60, 90
+- This means that you have 200 data points
+- But you only have 50 experimental units
+
+1) Mixed model
+  - Mite infestation on ALL days is part of the response variable
+  - Since each colony has been measured more than once, you need to make sure not to commit pseudoreplication (analyze data in a way that assumes more true replicates than you actually have)
+  - Takes into account that there are 4 measurements per colony by including colony ID as a random effect
+  - I'll give examples of this
+  
+2) ANCOVA-post
+  - Your response variable is only the mite infestation on the last sampling event
+  - You include 
+
+3) Post-only analysis
+  - Assuming that you randomly assigned your treatments to colonies at the start of the experiment, you can validly analyze only the post-treatment data
+  - Not as powerful
+  - I'd be hesitant to do this with variables that have high variance, like mite infestation
+
+## Code for mixed modeling
+### Mixed model of phoretic mite loads
+- Just accounting for the number of mites in sample
+  - Not yet correcting for different sized bee samples
+
+m.phor.nb1 <- glmer.nb(mites_in_sample ~ 
+                     trt + 
+                     days + 
+                     trt:days + 
+                     (1 | col_id), 
+                   data = tempdatum)
+summary(m.phor.nb1)
+
+- Ideally, I would prefer to use a composite response variable of successes and failures, e.g...
+
+glmer.nb(cbind(successes, failures) ~ 
+        etc)
+        
+glmer.nb(cbind(mites_in_sample, uninfested_bees) ~ 
+        etc)
+
+... but glmer.nb does not accept this formulation
+
+
+### So I use an "offset" which represents the denominator (the total number of bees in the sample)
+- You need to remember to use the link function on this offset
+
+m.phor <- glmer.nb(mites_in_sample ~ 
+                     trt + 
+                     days + 
+                     trt:days + 
+                     offset(log(bees_in_sample)) + 
+                     (1 | col_id),
+                   data = tempdatum)
+summary(m.phor)
+
+- To test significance of interaction
+  - first fit a model omitting the interaction
+  
+m.phor0 <- glmer.nb(mites_in_sample ~ 
+                     trt + 
+                     days +
+                     offset(log(bees_in_sample)) + 
+                     (1 | col_id),
+                   data = tempdatum)
+summary(m.phor0)
+
+- Then compare these *nested* models with an analysis of deviance (Crawley, 2013)
+anova(m.phor, m.phor0)
+
+- Rule for mixed-effects models (Crawley, 2013)
+  - Compare models that are fitted through Maximum Likelihood estimation (ML)
+  - But once you figure out which model is best, use the model that is fitted by REML
+
+
+# My current favorite way to summarize mixed-effects models for text, tables, and plotting
+- emmeans package to estimated marginal means (and CIs) for text, tables, and plotting
+
+
+- You can make an "interaction plot"
+emmip(m.bees, trt~days, type = "response", CIs = TRUE)
+
+
+- Summarize hypothetical model of frames of bees into a table instead of a plot
+emplot_bees <- emmip(m.bees, trt~days, type = "response", CIs = TRUE, plotit = FALSE)
+
+
+
+- For the models which included an offset, report the emm's and CIs adjusted for a hypothetical sample of 100 bees
+- This method is based on the emmeans documentation at: https://cran.r-project.org/web/packages/emmeans/vignettes/sophisticated.html#offsets
+
+emplot_phor <- emmip(m.phor, trt~days, type = "response", CIs = TRUE, plotit = FALSE, offset = log(100))
+
+
+
+
+
+
+
+
+
